@@ -1,0 +1,262 @@
+#cloud-config
+
+# cloud-init file for a node joining the GI shared Kubernetes cluster.
+# We expect to be run alongside a cloud-config that makes a
+# /opt/etc/kubernetes-credentials.env defining JOIN_ENDPOINT, JOIN_CERT_HASH,
+# JOIN_TOKEN, and optionally WORKER_LABEL_SPEC
+
+# Make sure to combine command lists
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+write_files:
+  - path: /opt/etc/kubernetes-setup.env
+    content: |
+      # These variables define the Kubernetes component versions we will use
+      CNI_VERSION="v0.8.2",
+      CRICTL_VERSION="v1.17.0",
+      # This is the version of Kubernetes to use
+      # Get current from: curl -sSL https://dl.k8s.io/release/stable.txt
+      # Make sure it is compatible with the kubelet.service unit we ship, or update that too.
+      KUBERNETES_VERSION="v1.19.0",
+      # YAML line that tells the Kubelet to use a cloud provider, if we need one.
+      CLOUD_PROVIDER_SPEC="cloud-provider: aws"
+
+  - path: /opt/bin/volumes.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -x
+      ephemeral_count=0
+      drives=()
+      directories=(docker kubelet)
+      for drive in /dev/xvd{a..z} /dev/nvme{0..26}n1; do
+          echo "checking for ${drive}"
+          if [ -b $drive ]; then
+              echo "found it"
+              while [ "$(readlink -f "${drive}")" != "${drive}" ] ; do
+                  drive="$(readlink -f "${drive}")"
+                  echo "was a symlink to ${drive}"
+              done
+              seen=0
+              for other_drive in "${drives[@]}" ; do
+                  if [ "${other_drive}" == "${drive}" ] ; then
+                      seen=1
+                      break
+                  fi
+              done
+              if (( "${seen}" == "1" )) ; then
+                  echo "already discovered via another name"
+                  continue
+              fi
+              if mount | grep "^${drive}"; then
+                  echo "already mounted, likely a root device"
+              else
+                  ephemeral_count=$((ephemeral_count + 1 ))
+                  drives+=("${drive}")
+                  echo "increased ephemeral count by one"
+              fi
+          fi
+      done
+      if (("$ephemeral_count" == "0" )); then
+          echo "no ephemeral drive"
+          for directory in "${directories[@]}"; do
+              sudo mkdir -p /var/lib/$directory
+          done
+          exit 0
+      fi
+      sudo mkdir /mnt/ephemeral
+      if (("$ephemeral_count" == "1" )); then
+          echo "one ephemeral drive to mount"
+          sudo mkfs.ext4 -F "${drives[@]}"
+          sudo mount "${drives[@]}" /mnt/ephemeral
+      fi
+      if (("$ephemeral_count" > "1" )); then
+          echo "multiple drives"
+          for drive in "${drives[@]}"; do
+              sudo dd if=/dev/zero of=$drive bs=4096 count=1024
+          done
+              # determine force flag
+              sudo mdadm --create -f --verbose /dev/md0 --level=0 --raid-devices=$ephemeral_count "${drives[@]}"
+              sudo mkfs.ext4 -F /dev/md0
+              sudo mount /dev/md0 /mnt/ephemeral
+          fi
+          for directory in "${directories[@]}"; do
+              sudo mkdir -p /mnt/ephemeral/var/lib/$directory
+              sudo mkdir -p /var/lib/$directory
+              sudo mount --bind /mnt/ephemeral/var/lib/$directory /var/lib/$directory
+      done
+  - path: /etc/systemd/system/volume-mounting.service
+    content: |
+      [Unit]
+      Description=mounts ephemeral volumes & bind mounts Docker and Kubernetes directories
+      Before=docker.service
+      [Service]
+      Type=oneshot
+      Restart=no
+      ExecStart=/usr/bin/bash /opt/bin/volumes.sh
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    content: |
+      # This came from https://raw.githubusercontent.com/kubernetes/release/v0.4.0/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf
+      # License: https://raw.githubusercontent.com/kubernetes/release/v0.4.0/LICENSE
+      # Note: This dropin only works with kubeadm and kubelet v1.11+
+      [Service]
+      Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
+      Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
+      # This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
+      EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+      # This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+      # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+      EnvironmentFile=-/etc/default/kubelet
+      ExecStart=
+      ExecStart=/opt/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+  - path: /etc/systemd/system/kubelet.service
+    content: |
+      # This came from https://raw.githubusercontent.com/kubernetes/release/v0.4.0/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service
+      # It has been modified to point to where we install the kubelet.
+      # License: https://raw.githubusercontent.com/kubernetes/release/v0.4.0/LICENSE
+      [Unit]
+      Description=kubelet: The Kubernetes Node Agent
+      Documentation=https://kubernetes.io/docs/home/
+      Wants=network-online.target
+      After=network-online.target
+      [Service]
+      ExecStart=/opt/bin/kubelet
+      Restart=always
+      StartLimitInterval=0
+      RestartSec=10
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/bin/install-kubernetes.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -e
+      PATH="$PATH:/opt/bin"
+      if ! which kubeadm ; then
+        # We don't have Kubernetes already.
+        mkdir -p /opt/cni/bin
+        curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+        mkdir -p /opt/bin
+        curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz" | tar -C /opt/bin -xz
+        cd /opt/bin
+        curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubelet,kubectl,kubeadm}
+        chmod +x {kubelet,kubectl,kubeadm}
+      fi
+  - path: /etc/systemd/system/install-kubernetes.service
+    content: |
+      [Unit]
+      Description=base Kubernetes installation
+      Wants=network-online.target
+      After=network-online.target
+      Before=kubelet.service
+      [Service]
+      Type=oneshot
+      Restart=no
+      EnvironmentFile=/opt/etc/kubernetes-setup.env
+      ExecStart=/usr/bin/bash /opt/bin/install-kubernetes.sh
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/etc/kubernetes-worker.yml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta2
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          volume-plugin-dir: "/opt/libexec/kubernetes/kubelet-plugins/volume/exec/"
+          kube-reserved: "memory=1Gi,ephemeral-storage=5Gi"
+          system-reserved: "memory=0.5Gi,ephemeral-storage=1Gi"
+          eviction-hard: "memory.available<200Mi,nodefs.available<10%"
+          {CLOUD_PROVIDER_SPEC}
+          {WORKER_LABEL_SPEC}
+      discovery:
+        bootstrapToken:
+          apiServerEndpoint: {JOIN_ENDPOINT}
+          token: {JOIN_TOKEN}
+          caCertHashes:
+          - "{JOIN_CERT_HASH}"
+      ---
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      cgroupDriver: systemd
+  - path: /opt/bin/configure-kubernetes-worker.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -e
+      # Sub in variables from our environment
+      sed -i "s/{CLOUD_PROVIDER_SPEC}/${CLOUD_PROVIDER_SPEC}/g" /opt/etc/kubernetes-worker.yml
+      sed -i "s/{WORKER_LABEL_SPEC}/${WORKER_LABEL_SPEC}/g" /opt/etc/kubernetes-worker.yml
+      sed -i "s/{JOIN_ENDPOINT}/${JOIN_ENDPOINT}/g" /opt/etc/kubernetes-worker.yml
+      sed -i "s/{JOIN_TOKEN}/${JOIN_TOKEN}/g" /opt/etc/kubernetes-worker.yml
+      sed -i "s/{JOIN_CERT_HASH}/${JOIN_CERT_HASH}/g" /opt/etc/kubernetes-worker.yml
+  - path: /etc/systemd/system/configure-kubernetes-worker.service
+    content: |
+      [Unit]
+      Description=setup for Kubernetes worker config
+      Wants=network-online.target
+      After=network-online.target
+      Before=kubelet.service
+      [Service]
+      Type=oneshot
+      Restart=no
+      EnvironmentFile=/opt/etc/kubernetes-setup.env
+      EnvironmentFile=/opt/etc/kubernetes-credentials.env
+      ExecStart=/usr/bin/bash /opt/bin/configure-kubernetes-worker.sh
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/bin/join-kubernetes-cluster.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -e
+      # We only really want to do this on first boot
+      if [[ -e /opt/etc/joined-to-cluster.marker ]] ; then
+        exit 0
+      fi
+      export PATH="$PATH:/opt/bin"
+      # We need the kubelet being restarted constantly by systemd while kubeadm is setting up.
+      # Systemd doesn't really let us say that in the unit file.
+      systemctl start kubelet
+      kubeadm join ${JOIN_ENDPOINT} --config /opt/etc/kubernetes-worker.yml
+      touch /opt/etc/joined-to-cluster.marker
+  - path: /etc/systemd/system/join-kubernetes-cluster.service
+    content: |
+      [Unit]
+      Description=Kubernetes cluster membership
+      After=install-kubernetes.service
+      After=docker.service
+      # Can't be before kubelet.service because Kubelet has to come up as we run this.
+      [Service]
+      Type=oneshot
+      Restart=no
+      EnvironmentFile=/opt/etc/kubernetes-setup.env
+      EnvironmentFile=/opt/etc/kubernetes-credentials.env
+      ExecStart=/usr/bin/bash /opt/bin/join-kubernetes-cluster.sh
+      [Install]
+      WantedBy=multi-user.target
+
+# Make sure all the installed services will start on the next boot
+runcmd:
+  - systemctl enable docker.service
+  - systemctl enable volume-mounting.service
+  - systemctl enable install-kubernetes.service
+  - systemctl enable kubelet.service
+  - systemctl enable join-kubernetes-cluster.service
+# Make sure to boot again and bring everything up
+power_state:
+  delay: "+1"
+  mode: reboot
+  timeout: 3600
+  condition: True
+  message: Rebooting to start Kubernetes...
+

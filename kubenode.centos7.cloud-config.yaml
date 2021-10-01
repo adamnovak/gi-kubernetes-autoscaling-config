@@ -1,0 +1,129 @@
+#cloud-init
+
+# This file is for CentOS-7-specific setup. We need a new kernel from elrepo
+# and we need to set it as the default to boot tthe default to boot to.
+
+# Make sure to combine command lists
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+write_files:
+- path: /etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+  contents: |
+    -----BEGIN PGP PUBLIC KEY BLOCK-----
+    Version: GnuPG v1.4.5 (GNU/Linux)
+
+    mQGiBEm+/6QRBAC5mbtqOFSQ0FkTLIMdIoqxtraIeUqwbPp3IBYQ/u/EREjyEf1D
+    qFyBEXII0dD8JDT85vRZ81jhB7nFWa0VbUfY0xfghkbnokiNBVNpiQcvszw3UYDF
+    aLAaOC8Z98vmlsQaBBTQG6704ZXLr7FJyG3GP5WE6egXIQQbrMcdmCoRBwCg/dwC
+    HLWjuemoDc5SX7hKHbB4zZ8D/jP+oMbqz+bDn8OZ2UuaGdxr+mHW8tzTdPjnEU8e
+    hUt1ws8eBqn/gMfKvUBa8xFSILe8Ty99u+VjFbcRsdf0H6dRre9AdDVUz5oxzoPw
+    gamA8mhPQvFh3wt9smtRUh5IoM2LiM1s5pGMLuYuvSnVUPArEnSfW6K5I6v7OarU
+    3WfrBACDEGGcaWKjfdkRtmKIQrzu6AnldVC1ISLVAoqxHnKNFTk1BgO0PSZDpfJI
+    x8fMCnGlusoL6F5+LYEk4K4B0zvlj1ur3JocjxpuBLccl94JTo/+I9ZbS8ptUqLw
+    LBUkgIQJzzIH4G5NZsQ3FpzSWGRFVa7etqTv9BfUMUmJxhEoobQ/ZWxyZXBvLm9y
+    ZyAoUlBNIFNpZ25pbmcgS2V5IGZvciBlbHJlcG8ub3JnKSA8c2VjdXJlQGVscmVw
+    by5vcmc+iGAEExECACAFAkm+/6QCGwMGCwkIBwMCBBUCCAMEFgIDAQIeAQIXgAAK
+    CRAwm8MFuq2uUlgWAKCGWOpyodbzxS7Xy/0X9m9qVnHq+ACfUHrQzYAtFRpT07Sg
+    giosE+mvAKu5Ag0ESb7/pxAIALgT0q0HhwugE717a7N+gAtCbFu8pCXOZcrAnJpG
+    cMA9VWmsODZStPTxXYM2ggCMSzUnNis8pPZOPIP5C+t2IYtVjLshM4C9UiY7u5ET
+    jErWCxWmF+2QLO50K56E4qxj0wufZt9P+Ih0USUM5L2oyrQG51uj/2v3Qq3igc8Z
+    NTtmEOfis3losusQbAfZtTBmNQ0570kkhMxiyavgAUxLenXHYrkDJFuL7XdBCmna
+    kykTn2dzU81rIDZ+QPxII4V/eZ5xGiRY/EDUIAysEV2m0NNZgWi/twUnZICm7zYp
+    VRviJrBnFTvNEPMhiGRnJgQp/Krv4WIHQ67N8lQg3q5RJX8AAwUH/0UBjBgbsuWR
+    dB+ZYWjKPBy+bJY/6HefPUuLrt3QDNINMW8kY7VzWRMWyGc4IlPJDW0nwOn/vT5H
+    Dgc3YmA3tm7cKj5wpFijzff61Db8eq+CUKGscKxDBGzHq6oirM5U7DQLmipCs5Eb
+    efwHIjE3aOUSnoQmniEnBWI2hm/rftmY9oJSi8xgns4wAokDPiMcucADtbV3fznx
+    ppuowtBi8bcGB1vJZjTySQcSKWv+IVp5ej06uZ9501BEm6HxUZkuAGPecP65kcQu
+    5bg7B7LQeI5AWyujqvfuWgAF34xhl9QU/sDWxM3wUog+bw7y8pyWCqnJhp70yx8o
+    SqzhFygT62eISQQYEQIACQUCSb7/pwIbDAAKCRAwm8MFuq2uUq8PAKC1+E2pSwiS
+    oHXkKYPYDwApsP1mVACfRe1YnggLYQtG9LMeweVQQC77rK8=
+    =qyRr
+    -----END PGP PUBLIC KEY BLOCK-----
+- path: /etc/docker/daemon.json
+- contents: |
+    {
+       "exec-opts": ["native.cgroupdriver=systemd"],
+       "log-driver": "json-file",
+       "log-opts": {
+           "max-size": "100m"
+       },
+       "storage-driver": "overlay2",
+       "storage-opts": [
+            "overlay2.override_kernel_check=true"
+       ]
+    }
+yum_repos:
+  # The name of the repository
+  elrepo-kernel:
+    # Any repository configuration options
+    # See: man yum.conf
+    #
+    # This one is required!
+    baseurl: http://download.fedoraproject.org/pub/epel/testing/5/$basearch
+    enabled: false
+    failovermethod: priority
+    gpgcheck: true
+    gpgkey: https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+    name: Extra Packages for Enterprise Linux 5 - Testing
+  elrepo:
+    name: ELRepo.org Community Enterprise Linux Repository - el7
+    baseurl: |
+      http://elrepo.org/linux/elrepo/el7/$basearch/
+      http://mirrors.coreix.net/elrepo/elrepo/el7/$basearch/
+      http://mirror.rackspace.com/elrepo/elrepo/el7/$basearch/
+      http://repos.lax-noc.com/elrepo/elrepo/el7/$basearch/
+      http://mirror.ventraip.net.au/elrepo/elrepo/el7/$basearch/
+    mirrorlist: http://mirrors.elrepo.org/mirrors-elrepo.el7
+    enabled: true
+    gpgcheck: true
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+    protect: false
+  elrepo-kernel:
+    name: ELRepo.org Community Enterprise Linux Kernel Repository - el7
+    baseurl: |
+      http://elrepo.org/linux/kernel/el7/$basearch/
+      http://mirrors.coreix.net/elrepo/kernel/el7/$basearch/
+      http://mirror.rackspace.com/elrepo/kernel/el7/$basearch/
+      http://repos.lax-noc.com/elrepo/kernel/el7/$basearch/
+      http://mirror.ventraip.net.au/elrepo/kernel/el7/$basearch/
+    mirrorlist: http://mirrors.elrepo.org/mirrors-elrepo-kernel.el7
+    enabled: true
+    gpgcheck: true
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
+    protect: false
+  docker-ce-stable:
+    name: Docker CE Stable - $basearch
+    baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+    enabled: true
+    gpgcheck: true
+    gpgkey: https://download.docker.com/linux/centos/gpg
+packages:
+  - kernel-ml
+  - yum-utils
+  - device-mapper-persistent-data
+  - lvm2
+  - docker-ce
+runcmd:
+  # TODO: What's the right GRUB_DEFAULT to select the new kernel?
+  - sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT=1/g' /etc/default/grub
+  - grub2-mkconfig -o /boot/grub2/grub.cfg
+  # Turn off swap on boot
+  - sed -i 's!/dev/mapper/centos-swap!#/dev/mapper/centos-swap!g' /etc/fstab
+  # Turn off SELinux on boot
+  - sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
+  # Load netfilter module on boot
+  - echo br_netfilter > /etc/modules-load.d/br_netfilter.conf
+  # And make sure we use it right
+  - touch /usr/lib/sysctl.d/00-system.conf
+  - sed -i 's/net.bridge.bridge-nf-call-iptables.*//g' /usr/lib/sysctl.d/00-system.conf 
+  - echo 'net.bridge.bridge-nf-call-iptables = 1' >> /usr/lib/sysctl.d/00-system.conf
+  # Set timezone
+  - timedatectl set-timezone America/Los_Angeles
+  # Make sure we have the right Docker directory
+  - mkdir -p /etc/systemd/system/docker.service.d
+  # And that Docker will start at boot
+  - systemctl enable docker.service
