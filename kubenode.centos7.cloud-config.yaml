@@ -108,9 +108,6 @@ packages:
   - lvm2
   - docker-ce
 runcmd:
-  # TODO: What's the right GRUB_DEFAULT to select the new kernel?
-  - sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT=1/g' /etc/default/grub
-  - grub2-mkconfig -o /boot/grub2/grub.cfg
   # Turn off swap on boot
   - sed -i 's!/dev/mapper/centos-swap!#/dev/mapper/centos-swap!g' /etc/fstab
   # Turn off SELinux on boot
