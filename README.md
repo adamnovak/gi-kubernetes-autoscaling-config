@@ -23,6 +23,12 @@ This repo contains configuration files that we can use to set up autoscaling nod
         -a kubenode.centos7.cloud-config.yaml:cloud-config \
     | gzip -c | base64 > user-data.txt
     ```
+    If your distribution doesn't ship `cloud-init`, you can install it in a Python virtualenv:
+    ```
+    virtualenv --python python3 venv
+    . venv/bin/activate
+    pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
+    ```
 4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run. Make sure to use an AMI that includes cloud-init.
 5. Make an AWS Autoscaling Group around the Launch Template. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
