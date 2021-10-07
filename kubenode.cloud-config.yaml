@@ -16,12 +16,12 @@ write_files:
   - path: /opt/etc/kubernetes-setup.env
     content: |
       # These variables define the Kubernetes component versions we will use
-      CNI_VERSION="v0.8.2",
-      CRICTL_VERSION="v1.17.0",
+      CNI_VERSION="v0.8.2"
+      CRICTL_VERSION="v1.17.0"
       # This is the version of Kubernetes to use
       # Get current from: curl -sSL https://dl.k8s.io/release/stable.txt
       # Make sure it is compatible with the kubelet.service unit we ship, or update that too.
-      KUBERNETES_VERSION="v1.19.0",
+      KUBERNETES_VERSION="v1.19.0"
       # YAML line that tells the Kubelet to use a cloud provider, if we need one.
       CLOUD_PROVIDER_SPEC="cloud-provider: aws"
 
@@ -29,7 +29,7 @@ write_files:
     permissions: '0755'
     content: |
       #!/bin/bash
-      set -x
+      set -ex
       ephemeral_count=0
       drives=()
       directories=(docker kubelet)
@@ -138,7 +138,7 @@ write_files:
     permissions: '0755'
     content: |
       #!/usr/bin/env bash
-      set -e
+      set -ex
       PATH="$PATH:/opt/bin"
       if ! which kubeadm ; then
         # We don't have Kubernetes already.
@@ -191,13 +191,14 @@ write_files:
     permissions: '0755'
     content: |
       #!/usr/bin/env bash
-      set -e
+      set -ex
       # Sub in variables from our environment
-      sed -i "s/{CLOUD_PROVIDER_SPEC}/${CLOUD_PROVIDER_SPEC}/g" /opt/etc/kubernetes-worker.yml
-      sed -i "s/{WORKER_LABEL_SPEC}/${WORKER_LABEL_SPEC}/g" /opt/etc/kubernetes-worker.yml
-      sed -i "s/{JOIN_ENDPOINT}/${JOIN_ENDPOINT}/g" /opt/etc/kubernetes-worker.yml
-      sed -i "s/{JOIN_TOKEN}/${JOIN_TOKEN}/g" /opt/etc/kubernetes-worker.yml
-      sed -i "s/{JOIN_CERT_HASH}/${JOIN_CERT_HASH}/g" /opt/etc/kubernetes-worker.yml
+      # TODO: maybe these strings aren't allowed in a sed command?
+      sed -i "s!{CLOUD_PROVIDER_SPEC}!${CLOUD_PROVIDER_SPEC}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{WORKER_LABEL_SPEC}!${WORKER_LABEL_SPEC}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{JOIN_ENDPOINT}!${JOIN_ENDPOINT}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{JOIN_TOKEN}!${JOIN_TOKEN}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{JOIN_CERT_HASH}!${JOIN_CERT_HASH}!g" /opt/etc/kubernetes-worker.yml
   - path: /etc/systemd/system/configure-kubernetes-worker.service
     content: |
       [Unit]
@@ -218,7 +219,7 @@ write_files:
     permissions: '0755'
     content: |
       #!/usr/bin/env bash
-      set -e
+      set -ex
       # We only really want to do this on first boot
       if [[ -e /opt/etc/joined-to-cluster.marker ]] ; then
         exit 0
@@ -250,6 +251,7 @@ runcmd:
   - systemctl enable docker.service
   - systemctl enable volume-mounting.service
   - systemctl enable install-kubernetes.service
+  - systemctl enable configure-kubernetes-worker.service
   - systemctl enable kubelet.service
   - systemctl enable join-kubernetes-cluster.service
 # Make sure to boot again and bring everything up

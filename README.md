@@ -15,13 +15,13 @@ This repo contains configuration files that we can use to set up autoscaling nod
     export JOIN_ENDPOINT="$(hostname):6443"
     env | grep "^JOIN_"
     ```
-3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, while for a Flatcar AMI you should not (although Flatcar's ignition may not actually understand the gzip/mime-multipart encoding or some of the cloud-config keys used).
+3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, while for a Flatcar AMI you should not (although Flatcar's ignition may not actually understand the gzip/mime-multipart encoding or some of the cloud-config keys used).
     ```
     cloud-init devel make-mime \
         -a kubenode.cloud-config.yaml:cloud-config \
         -a kubenode.credentials.cloud-config.yaml:cloud-config \
         -a kubenode.centos7.cloud-config.yaml:cloud-config \
-    | gzip -c | base64 > user-data.txt
+    | gzip -c | base64 | tr -d '\n' > user-data.txt
     ```
     If your distribution doesn't ship `cloud-init`, you can install it in a Python virtualenv:
     ```
@@ -29,7 +29,7 @@ This repo contains configuration files that we can use to set up autoscaling nod
     . venv/bin/activate
     pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
     ```
-4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run. Make sure to use an AMI that includes cloud-init.
+4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice.
 5. Make an AWS Autoscaling Group around the Launch Template. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
     Owner=<your email>

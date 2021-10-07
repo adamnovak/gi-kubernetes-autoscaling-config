@@ -12,7 +12,7 @@ merge_how:
 
 write_files:
 - path: /etc/pki/rpm-gpg/RPM-GPG-KEY-elrepo.org
-  contents: |
+  content: |
     -----BEGIN PGP PUBLIC KEY BLOCK-----
     Version: GnuPG v1.4.5 (GNU/Linux)
 
@@ -43,8 +43,8 @@ write_files:
     oHXkKYPYDwApsP1mVACfRe1YnggLYQtG9LMeweVQQC77rK8=
     =qyRr
     -----END PGP PUBLIC KEY BLOCK-----
-- path: /etc/docker/daemon.json
-- contents: |
+- path: /etc/docker/daemon.jso!5!An
+  content: |
     {
        "exec-opts": ["native.cgroupdriver=systemd"],
        "log-driver": "json-file",
