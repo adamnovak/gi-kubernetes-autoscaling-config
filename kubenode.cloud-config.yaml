@@ -23,7 +23,8 @@ write_files:
       # Make sure it is compatible with the kubelet.service unit we ship, or update that too.
       KUBERNETES_VERSION="v1.19.0"
       # YAML line that tells the Kubelet to use a cloud provider, if we need one.
-      CLOUD_PROVIDER_SPEC="cloud-provider: aws"
+      #CLOUD_PROVIDER_SPEC="cloud-provider: aws"
+      CLOUD_PROVIDER_SPEC=""
 
   - path: /opt/bin/volumes.sh
     permissions: '0755'
@@ -79,21 +80,23 @@ write_files:
           for drive in "${drives[@]}"; do
               sudo dd if=/dev/zero of=$drive bs=4096 count=1024
           done
-              # determine force flag
-              sudo mdadm --create -f --verbose /dev/md0 --level=0 --raid-devices=$ephemeral_count "${drives[@]}"
-              sudo mkfs.ext4 -F /dev/md0
-              sudo mount /dev/md0 /mnt/ephemeral
-          fi
-          for directory in "${directories[@]}"; do
-              sudo mkdir -p /mnt/ephemeral/var/lib/$directory
-              sudo mkdir -p /var/lib/$directory
-              sudo mount --bind /mnt/ephemeral/var/lib/$directory /var/lib/$directory
+          # determine force flag
+          sudo mdadm --create -f --verbose /dev/md0 --level=0 --raid-devices=$ephemeral_count "${drives[@]}"
+          sudo mkfs.ext4 -F /dev/md0
+          sudo mount /dev/md0 /mnt/ephemeral
+      fi
+      for directory in "${directories[@]}"; do
+          sudo mkdir -p /mnt/ephemeral/var/lib/$directory
+          sudo mkdir -p /var/lib/$directory
+          sudo mount --bind /mnt/ephemeral/var/lib/$directory /var/lib/$directory
       done
+      echo "Volume setup complete!"
   - path: /etc/systemd/system/volume-mounting.service
     content: |
       [Unit]
       Description=mounts ephemeral volumes & bind mounts Docker and Kubernetes directories
       Before=docker.service
+      Before=kubelet.service
       [Service]
       Type=oneshot
       Restart=no
@@ -175,6 +178,7 @@ write_files:
           kube-reserved: "memory=1Gi,ephemeral-storage=5Gi"
           system-reserved: "memory=0.5Gi,ephemeral-storage=1Gi"
           eviction-hard: "memory.available<200Mi,nodefs.available<10%"
+          {PROVIDER_ID_SPEC}
           {CLOUD_PROVIDER_SPEC}
           {WORKER_LABEL_SPEC}
       discovery:
@@ -192,8 +196,17 @@ write_files:
     content: |
       #!/usr/bin/env bash
       set -ex
+      # Determine a provider ID spec if we aren't using a cloud provider
+      if [[ -z "${CLOUD_PROVIDER_SPEC}" ]] ; then
+        INSTANCE_ID="$(curl http://169.254.169.254/latest/meta-data/instance-id)"
+        PLACEMENT_AZ="$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)"
+        PROVIDER_ID_SPEC="provider-id: \"aws:///${PLACEMENT_AZ}/${INSTANCE_ID}\""
+      else
+        PROVIDER_ID_SPEC=""
+      fi
       # Sub in variables from our environment
       # TODO: maybe these strings aren't allowed in a sed command?
+      sed -i "s!{PROVIDER_ID_SPEC}!${PROVIDER_ID_SPE!Y!;C}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{CLOUD_PROVIDER_SPEC}!${CLOUD_PROVIDER_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{WORKER_LABEL_SPEC}!${WORKER_LABEL_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_ENDPOINT}!${JOIN_ENDPOINT}!g" /opt/etc/kubernetes-worker.yml
@@ -221,21 +234,24 @@ write_files:
       #!/usr/bin/env bash
       set -ex
       # We only really want to do this on first boot
-      if [[ -e /opt/etc/joined-to-cluster.marker ]] ; then
+      if [[ -e /var/lib/kubelet/joined-to-cluster.marker ]] ; then
         exit 0
       fi
       export PATH="$PATH:/opt/bin"
+      # The kubelet will complain constantly if we don't have this
+      mkdir -p /etc/kubernetes/manifests
       # We need the kubelet being restarted constantly by systemd while kubeadm is setting up.
       # Systemd doesn't really let us say that in the unit file.
       systemctl start kubelet
       kubeadm join ${JOIN_ENDPOINT} --config /opt/etc/kubernetes-worker.yml
-      touch /opt/etc/joined-to-cluster.marker
+      touch /var/lib/kubelet/joined-to-cluster.marker
   - path: /etc/systemd/system/join-kubernetes-cluster.service
     content: |
       [Unit]
       Description=Kubernetes cluster membership
       After=install-kubernetes.service
       After=docker.service
+      After=volume-mounting.service
       # Can't be before kubelet.service because Kubelet has to come up as we run this.
       [Service]
       Type=oneshot

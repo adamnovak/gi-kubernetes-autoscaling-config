@@ -43,7 +43,7 @@ write_files:
     oHXkKYPYDwApsP1mVACfRe1YnggLYQtG9LMeweVQQC77rK8=
     =qyRr
     -----END PGP PUBLIC KEY BLOCK-----
-- path: /etc/docker/daemon.jso!5!An
+- path: /etc/docker/daemon.json
   content: |
     {
        "exec-opts": ["native.cgroupdriver=systemd"],

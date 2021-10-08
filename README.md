@@ -7,16 +7,18 @@ This repo contains configuration files that we can use to set up autoscaling nod
 1. Create a real credentials configuration file:
     ```
     cp kubenode.credentials.cloud-config.yaml.example kubenode.credentials.cloud-config.yaml
+    chmod 600 kubenode.credentials.cloud-config.yaml
     ```
 2. Edit `kubenode.credentials.cloud-config.yaml` and add the credentials from the leader. You can generate them like:
     ```
     export JOIN_TOKEN=$(kubeadm token create --ttl 0)
     export JOIN_CERT_HASH=sha256:$(openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //')
-    export JOIN_ENDPOINT="$(hostname):6443"
+    export JOIN_ENDPOINT="$(curl http://checkip.amazonaws.com):6443"
     env | grep "^JOIN_"
     ```
 3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, while for a Flatcar AMI you should not (although Flatcar's ignition may not actually understand the gzip/mime-multipart encoding or some of the cloud-config keys used).
     ```
+    umask 0066
     cloud-init devel make-mime \
         -a kubenode.cloud-config.yaml:cloud-config \
         -a kubenode.credentials.cloud-config.yaml:cloud-config \
