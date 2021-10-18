@@ -107,6 +107,9 @@ packages:
   - device-mapper-persistent-data
   - lvm2
   - docker-ce
+  - conntrack-tools
+  - socat
+  - ebtables
 runcmd:
   # Turn off swap on boot
   - sed -i 's!/dev/mapper/centos-swap!#/dev/mapper/centos-swap!g' /etc/fstab
