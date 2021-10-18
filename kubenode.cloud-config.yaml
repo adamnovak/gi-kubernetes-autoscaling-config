@@ -206,7 +206,7 @@ write_files:
       fi
       # Sub in variables from our environment
       # TODO: maybe these strings aren't allowed in a sed command?
-      sed -i "s!{PROVIDER_ID_SPEC}!${PROVIDER_ID_SPE!Y!;C}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{PROVIDER_ID_SPEC}!${PROVIDER_ID_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{CLOUD_PROVIDER_SPEC}!${CLOUD_PROVIDER_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{WORKER_LABEL_SPEC}!${WORKER_LABEL_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_ENDPOINT}!${JOIN_ENDPOINT}!g" /opt/etc/kubernetes-worker.yml
