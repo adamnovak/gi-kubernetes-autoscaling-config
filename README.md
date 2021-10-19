@@ -35,11 +35,11 @@ This repo contains configuration files that we can use to set up autoscaling nod
 5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
     Owner=<your email>
-    kubernetes.io/cluster/gi-cluster=
+    kubernetes.io/cluster/cg-kubernetes=
     ```
     And the following tags just on the Autoscaling Group itself:
     ```
-    k8s.io/cluster-autoscaler/gi-cluster=
+    k8s.io/cluster-autoscaler/cg-kubernetes=
     k8s.io/cluster-autoscaler/enabled=
     k8s.io/cluster-autoscaler/node-template/resources/ephemeral-storage=<amount of ephemeral storage the instances will provide in GiB, like "24G">
     ```
