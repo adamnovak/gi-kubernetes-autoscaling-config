@@ -100,6 +100,7 @@ write_files:
       [Service]
       Type=oneshot
       Restart=no
+      RemainAfterExit=yes
       ExecStart=/usr/bin/bash /opt/bin/volumes.sh
       [Install]
       WantedBy=multi-user.target
@@ -171,6 +172,7 @@ write_files:
       # TODO: After everyone has systemd v244+, use systemd restart to retry on
       # network errors.
       Restart=no
+      RemainAfterExit=yes
       EnvironmentFile=/opt/etc/kubernetes-setup.env
       # We need to escape $ as $$ in systemd units.
       ExecStart=/usr/bin/bash -c 'for ATTEMPT in {1..10} ; do /opt/bin/install-kubernetes.sh ; WORKED="$${?}" ; if [[ "$${WORKED}" == "0" ]] ; then break ; fi ; sleep 10 ; done ; exit "$${WORKED}";'
@@ -232,6 +234,7 @@ write_files:
       [Service]
       Type=oneshot
       Restart=no
+      RemainAfterExit=yes
       EnvironmentFile=/opt/etc/kubernetes-setup.env
       EnvironmentFile=/opt/etc/kubernetes-credentials.env
       ExecStart=/usr/bin/bash /opt/bin/configure-kubernetes-worker.sh
@@ -272,6 +275,7 @@ write_files:
       [Service]
       Type=oneshot
       Restart=no
+      RemainAfterExit=yes
       EnvironmentFile=/opt/etc/kubernetes-setup.env
       EnvironmentFile=/opt/etc/kubernetes-credentials.env
       ExecStart=/usr/bin/bash /opt/bin/join-kubernetes-cluster.sh
