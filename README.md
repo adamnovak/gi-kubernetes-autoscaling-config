@@ -63,5 +63,52 @@ curl -sSL https://raw.githubusercontent.com/kubernetes/autoscaler/cluster-autosc
     sed 's|path: "/etc/ssl/certs/ca-bundle.crt"|path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"|' | \
     kubectl apply -f -
 ```
-    
+
+To work, the leader nodes will need an IAM role assigned (`KubernetesAutoscaler`) with this IAM policy (`MinimalKubernetesAutoscalingPermissions`) attached:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeLaunchConfigurations",
+                "autoscaling:DescribeTags",
+                "autoscaling:SetDesiredCapacity",
+                "autoscaling:TerminateInstanceInAutoScalingGroup",
+                "ec2:DescribeInstances",
+                "ec2:DescribeLaunchTemplateVersions",
+                "ec2:DescribeRegions",
+                "ec2:DescribeRouteTables",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeVolumes",
+                "ec2:DescribeVpcs"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+For the autoscaler to work well, you want the cluster's scheduler to pack jobs onto as few nodes as possible. If it spreads the work evenly over all the nodes in the cluster, then having pods that the autoscaler isn't willing to preempt (like non-preemptable Toil jobs) will prevent nodes from scaling down when they aren't needed. All nodes will have a few jobs that block them from being scaled away, and the autoscaler doesn't do anything to cordon nodes and prevent new jobs from landing on them, to try and get an empty node to scale away. You will want to create a config file like this, mount it into your scheduler pods, and set them to use it:
+
+```
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /etc/kubernetes/scheduler.conf
+profiles:
+  - schedulerName: default-scheduler
+    plugins:
+      score:
+        disabled:
+        - name: NodeResourcesLeastAllocated
+        enabled:
+        - name: NodeResourcesMostAllocated
+          weight: 1
+```
      
