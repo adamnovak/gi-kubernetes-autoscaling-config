@@ -90,6 +90,11 @@ write_files:
           sudo mkdir -p /var/lib/$directory
           sudo mount --bind /mnt/ephemeral/var/lib/$directory /var/lib/$directory
       done
+      # UCSC GI cluster provides a /data/scratch on each node for inter-pod caching.
+      # TODO: cleanup with a crontab?
+      sudo mkdir -p /mnt/ephemeral/data/scratch
+      sudo mkdir -p /data/scratch
+      sudo mount --bind /mnt/ephemeral/data/scratch /data/scratch
       echo "Volume setup complete!"
   - path: /etc/systemd/system/volume-mounting.service
     content: |
