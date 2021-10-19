@@ -32,8 +32,9 @@ This repo contains configuration files that we can use to set up autoscaling nod
     pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
     ```
 4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice.
-5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
+5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Set the minimum size to 0, and the maximum size to a sensible limit. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
+    Name=cg-kube-node
     Owner=<your email>
     kubernetes.io/cluster/cg-kubernetes=
     ```
@@ -46,5 +47,21 @@ This repo contains configuration files that we can use to set up autoscaling nod
     When computing ephemeral storage, make sure to account for overhead: Partitioning seems to spirit away a bit over a GiB of space, plus there's around half a GiB of images the node will need, and contrary to what https://aws.amazon.com/ec2/instance-types/ says instance ephemeral SSDs are sized in GB. You may also need to account for space that will be allocated to system pods/daemon sets; it's not clear whether the autoscaler accounts for them, and they need about 14 GiB of storage. An underestimate here is safe; an overestimate can get the autoscaler stuck spinning up many of the same node, thinking each time a pod will fit when it won't.
     
 6. Assuming the Kubernetes Cluster Autoscaler is running on the control plane, it should (eventually?) discover the Autoscaling Group. It might need to be restarted to do it. Then it should start using the Autoscaling Group to provision nodes when it thinks it needs them.
+
+## Cluster Preparation
+
+In order for the cluster to actually scale the Autoscaling Groups, it needs to be running the Cluster Autoscaler. To install it, modify the demplate from the documentation to match the cluster, and apply it:
+
+```
+CLUSTER_NAME=cg-kubernetes
+AUTOSCALER_VERSION="1.19.0"
+curl -sSL https://raw.githubusercontent.com/kubernetes/autoscaler/cluster-autoscaler-${AUTOSCALER_VERSION}/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-run-on-master.yaml | \
+    sed "s|--nodes={{ node_asg_min }}:{{ node_asg_max }}:{{ name }}|--node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/${CLUSTER_NAME}|" | \
+    sed 's|kubernetes.io/role: master|node-role.kubernetes.io/master: ""|' | \
+    sed 's|operator: "Equal"|operator: "Exists"|' | \
+    sed '/value: "true"/d' | \
+    sed 's|path: "/etc/ssl/certs/ca-bundle.crt"|path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"|' | \
+    kubectl apply -f -
+```
     
      
