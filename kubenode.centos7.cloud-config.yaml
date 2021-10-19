@@ -110,6 +110,7 @@ packages:
   - conntrack-tools
   - socat
   - ebtables
+  - mdadm
 runcmd:
   # Boot to the new kernel
   - sed -i 's/GRUB_DEFAULT=.*/GRUB_DEFAULT=0/g' /etc/default/grub
