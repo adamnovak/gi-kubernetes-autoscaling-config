@@ -69,7 +69,7 @@ write_files:
           done
           exit 0
       fi
-      sudo mkdir /mnt/ephemeral
+      sudo mkdir -p /mnt/ephemeral
       if (("$ephemeral_count" == "1" )); then
           echo "one ephemeral drive to mount"
           sudo mkfs.ext4 -F "${drives[@]}"
@@ -247,11 +247,29 @@ write_files:
     content: |
       #!/usr/bin/env bash
       set -ex
-      # We only really want to do this on first boot
+      export PATH="$PATH:/opt/bin"
       if [[ -e /var/lib/kubelet/joined-to-cluster.marker ]] ; then
+        # We only really want to do this on first boot on a given ephemeral filesystem.
         exit 0
       fi
-      export PATH="$PATH:/opt/bin"
+      if [[ -e /etc/kubernetes/kubelet.conf || -e /etc/kubernetes/pki/ca.crt ]] ; then
+        # We are rejoining after clobbering our ephemeral storage.
+        # kubeadm reset would undo our bind mounts, so delete stuff manually.
+        # This isn't enough to clean up after actually starting the kubelet!
+        systemctl stop kubelet
+        rm -Rf \
+            /etc/kubernetes/admin.conf \
+            /etc/kubernetes/kubelet.conf \
+            /etc/kubernetes/bootstrap-kubelet.conf \
+            /etc/kubernetes/controller-manager.conf \
+            /etc/kubernetes/scheduler.conf \
+            /etc/kubernetes/manifests/* \
+            /etc/kubernetes/pki/* \
+            /var/lib/kubelet/* \
+            /var/lib/dockershim/* \
+            /var/run/kubernetes/* \
+            /var/lib/cni/*
+      fi
       # The kubelet will complain constantly if we don't have this
       mkdir -p /etc/kubernetes/manifests
       # We need the kubelet being restarted constantly by systemd while kubeadm is setting up.

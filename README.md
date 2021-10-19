@@ -31,8 +31,8 @@ This repo contains configuration files that we can use to set up autoscaling nod
     . venv/bin/activate
     pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
     ```
-4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice.
-5. Make an AWS Autoscaling Group around the Launch Template. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
+4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice.
+5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
     Owner=<your email>
     kubernetes.io/cluster/gi-cluster=
@@ -41,8 +41,10 @@ This repo contains configuration files that we can use to set up autoscaling nod
     ```
     k8s.io/cluster-autoscaler/gi-cluster=
     k8s.io/cluster-autoscaler/enabled=
-    k8s.io/cluster-autoscaler/node-template/resources/ephemeral-storage=<amount of ephemeral storage the instances will provide, like "24G">
+    k8s.io/cluster-autoscaler/node-template/resources/ephemeral-storage=<amount of ephemeral storage the instances will provide in GiB, like "24G">
     ```
+    When computing ephemeral storage, make sure to account for overhead: Partitioning seems to spirit away a bit over a GiB of space, plus there's around half a GiB of images the node will need, and contrary to what https://aws.amazon.com/ec2/instance-types/ says instance ephemeral SSDs are sized in GB. You may also need to account for space that will be allocated to system pods/daemon sets; it's not clear whether the autoscaler accounts for them, and they need about 14 GiB of storage. An underestimate here is safe; an overestimate can get the autoscaler stuck spinning up many of the same node, thinking each time a pod will fit when it won't.
+    
 6. Assuming the Kubernetes Cluster Autoscaler is running on the control plane, it should (eventually?) discover the Autoscaling Group. It might need to be restarted to do it. Then it should start using the Autoscaling Group to provision nodes when it thinks it needs them.
     
      
