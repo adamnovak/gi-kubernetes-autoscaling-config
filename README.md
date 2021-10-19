@@ -133,3 +133,40 @@ scheduler:
 ```
 kubeadm init phase control-plane scheduler --config=configfile.yaml
 ```
+
+To get rid of nodes that are scaled away, you will want to make sure you have `jq`, and make an executable `/usr/local/bin/cleanup-nodes.sh`:
+
+```
+#!/usr/bin/env bash
+# cleanup-nodes.sh: constantly clean up NotReady nodes that are tainted as having been deleted
+set -e
+while true ; do
+    echo "$(date | tr -d '\\n'): Checking for scaled-in nodes..."
+    for NODE_NAME in $(kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o json | jq -r '.items[] | select(.spec.taints) | select(.spec.taints[] | select(.key == "ToBeDeletedByClusterAutoscaler")) | select(.spec.taints[] | select(.key == "node.kubernetes.io/unreachable")) | select(.status.conditions[] | select(.type == "Ready" and .status == "Unknown")) | .metadata.name' | tr '\\n' ' ') ; do
+        # For every node that's tainted as ToBeDeletedByClusterAutoscaler, and
+        # as node.kubernetes.io/unreachable, and hasn't dialed in recently (and
+        # is thus in readiness state Unknown)
+        echo "Node $NODE_NAME is supposed to be scaled away and also gone. Removing from cluster..."
+        # Drop it if possible
+        kubectl --kubeconfig /etc/kubernetes/admin.conf delete node "$NODE_NAME" || true
+    done
+    sleep 300
+done
+```
+
+And an `/etc/systemd/system/cleanup-nodes.service`:
+
+```
+[Unit]
+Description=Remove scaled-in nodes
+After=kubelet.service
+[Service]
+ExecStart=/usr/local/bin/cleanup-nodes.sh
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+```
+
+And then enable and start the service.
