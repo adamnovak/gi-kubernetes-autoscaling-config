@@ -97,6 +97,7 @@ To work, the leader nodes will need an IAM role assigned (`KubernetesAutoscaler`
 For the autoscaler to work well, you want the cluster's scheduler to pack jobs onto as few nodes as possible. If it spreads the work evenly over all the nodes in the cluster, then having pods that the autoscaler isn't willing to preempt (like non-preemptable Toil jobs) will prevent nodes from scaling down when they aren't needed. All nodes will have a few jobs that block them from being scaled away, and the autoscaler doesn't do anything to cordon nodes and prevent new jobs from landing on them, to try and get an empty node to scale away. You will want to create a config file like this, mount it into your scheduler pods, and set them to use it:
 
 ```
+# /etc/kubernetes/scheduler-config.yml
 apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -111,4 +112,24 @@ profiles:
         - name: NodeResourcesMostAllocated
           weight: 1
 ```
-     
+
+To add this setting to an existing cluster, make sure that `/etc/kubernetes/manifests/kube-scheduler.yaml` specifies a `--config` option for the scheduler. You may need the scheduler config file to specify all the options previously passed on the command line, in case the config file overrides them. If the cluster is managed with `kubeadm`, you may be able to rerun the `control-plane/scheduler` phase with a config file like this:
+
+```
+# configfile.yaml
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+scheduler:
+  extraArgs:
+    config: "/etc/kubernetes/scheduler-config.yml"
+  extraVolumes:
+    - name: schedulerconfig
+      hostPath: "/etc/kubernetes/scheduler-config.yml"
+      mountPath: "/etc/kubernetes/scheduler-config.yml"
+      readOnly: true
+      pathType: "File"
+```
+
+```
+kubeadm init phase control-plane scheduler --config=configfile.yaml
+```
