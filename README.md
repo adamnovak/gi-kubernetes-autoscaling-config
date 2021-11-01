@@ -142,7 +142,7 @@ To get rid of nodes that are scaled away, you will want to make sure you have `j
 set -e
 while true ; do
     echo "$(date | tr -d '\\n'): Checking for scaled-in nodes..."
-    for NODE_NAME in $(kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o json | jq -r '.items[] | select(.spec.taints) | select(.spec.taints[] | select(.key == "ToBeDeletedByClusterAutoscaler")) | select(.spec.taints[] | select(.key == "node.kubernetes.io/unreachable")) | select(.status.conditions[] | select(.type == "Ready" and .status == "Unknown")) | .metadata.name' | tr '\\n' ' ') ; do
+    for NODE_NAME in $(kubectl --kubeconfig /etc/kubernetes/admin.conf get nodes -o json | jq -r '.items[] | select(.spec.taints) | select(.spec.taints[] | select(.key == "ToBeDeletedByClusterAutoscaler")) | select(.spec.taints[] | select(.key == "node.kubernetes.io/unreachable")) | select(.status.conditions[] | select(.type == "Ready" and .status == "Unknown")) | .metadata.name' | tr '\n' ' ') ; do
         # For every node that's tainted as ToBeDeletedByClusterAutoscaler, and
         # as node.kubernetes.io/unreachable, and hasn't dialed in recently (and
         # is thus in readiness state Unknown)
