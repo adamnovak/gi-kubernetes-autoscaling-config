@@ -54,8 +54,8 @@ In order for the cluster to actually scale the Autoscaling Groups, it needs to b
 
 ```
 CLUSTER_NAME=cg-kubernetes
-AUTOSCALER_VERSION="1.19.0"
-curl -sSL https://raw.githubusercontent.com/kubernetes/autoscaler/cluster-autoscaler-${AUTOSCALER_VERSION}/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-run-on-master.yaml | \
+AUTOSCALER_VERSION="1.21.1"
+curl -sSL https://raw.githubusercontent.com/kubernetes/autoscaler/cluster-autoscaler-${AUTOSCALER_VERSION}/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-run-on-control-plane.yaml | \
     sed "s|--nodes={{ node_asg_min }}:{{ node_asg_max }}:{{ name }}|--node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/${CLUSTER_NAME}|" | \
     sed 's|kubernetes.io/role: master|node-role.kubernetes.io/master: ""|' | \
     sed 's|operator: "Equal"|operator: "Exists"|' | \
@@ -169,4 +169,9 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-And then enable and start the service.
+And then enable and start the service:
+
+```
+sudo systemctl enable cleanup-nodes
+sudo systemctl start cleanup-nodes
+```
