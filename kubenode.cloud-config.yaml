@@ -198,6 +198,7 @@ write_files:
           {PROVIDER_ID_SPEC}
           {CLOUD_PROVIDER_SPEC}
           {WORKER_LABEL_SPEC}
+          {WORKER_TAINT_SPEC}
       discovery:
         bootstrapToken:
           apiServerEndpoint: {JOIN_ENDPOINT}
@@ -226,6 +227,7 @@ write_files:
       sed -i "s!{PROVIDER_ID_SPEC}!${PROVIDER_ID_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{CLOUD_PROVIDER_SPEC}!${CLOUD_PROVIDER_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{WORKER_LABEL_SPEC}!${WORKER_LABEL_SPEC}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{WORKER_TAINT_SPEC}!${WORKER_TAINT_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_ENDPOINT}!${JOIN_ENDPOINT}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_TOKEN}!${JOIN_TOKEN}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_CERT_HASH}!${JOIN_CERT_HASH}!g" /opt/etc/kubernetes-worker.yml

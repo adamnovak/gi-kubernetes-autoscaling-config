@@ -16,6 +16,7 @@ This repo contains configuration files that we can use to set up autoscaling nod
     export JOIN_ENDPOINT="$(curl http://checkip.amazonaws.com):6443"
     env | grep "^JOIN_"
     ```
+    If provisioning spot nodes, make sure to include label and/or taints in WORKER_LABEL_SPEC and/or WORKER_TAINT_SPEC, such as `node-labels: 'eks.amazonaws.com/capacityType=SPOT'` or `node-taints: 'cloud.google.com/gke-preemptible=true'"`.
 3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, while for a Flatcar AMI you should not (although Flatcar's ignition may not actually understand the gzip/mime-multipart encoding or some of the cloud-config keys used).
     ```
     umask 0066
@@ -31,21 +32,25 @@ This repo contains configuration files that we can use to set up autoscaling nod
     . venv/bin/activate
     pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
     ```
-4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice.
-5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Set the minimum size to 0, and the maximum size to a sensible limit. Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
+4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice. **Don't** check the request spot instance box here; configure that, if applicable, in the Autoscaling Group later.
+5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Set the minimum size to 0, and the maximum size to a sensible limit.
+    If using multiple instance types for a spot ASG, you may be best off using capacity-optimized rather than lowest-price balancing; the cheapest spot pool may be full, at which point the whole ASG can't scale up.
+    Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
     ```
-    Name=cg-kube-node
-    Owner=<your email>
-    kubernetes.io/cluster/cg-kubernetes=
-    ```
-    And the following tags just on the Autoscaling Group itself:
-    ```
-    k8s.io/cluster-autoscaler/cg-kubernetes=
-    k8s.io/cluster-autoscaler/enabled=
-    k8s.io/cluster-autoscaler/node-template/resources/ephemeral-storage=<amount of ephemeral storage the instances will provide in GiB, like "24G">
+    Name = cg-kube-node
+    Owner = <your email>
+    kubernetes.io/cluster/cg-kubernetes = <empty>
+    k8s.io/cluster-autoscaler/cg-kubernetes = <empty>
+    k8s.io/cluster-autoscaler/enabled = <empty>
+    k8s.io/cluster-autoscaler/node-template/resources/ephemeral-storage = <amount of ephemeral storage the instances will provide in GiB, like "24G">
     ```
     When computing ephemeral storage, make sure to account for overhead: Partitioning seems to spirit away a bit over a GiB of space, plus there's around half a GiB of images the node will need, and contrary to what https://aws.amazon.com/ec2/instance-types/ says instance ephemeral SSDs are sized in GB. You may also need to account for space that will be allocated to system pods/daemon sets; it's not clear whether the autoscaler accounts for them, and they need about 14 GiB of storage. An underestimate here is safe; an overestimate can get the autoscaler stuck spinning up many of the same node, thinking each time a pod will fit when it won't.
-    
+    If using particular labels or taints, such as on spot nodes, you will also need to add those to the ASG itself as tags, so the autoscaler knows that they will apply to the nodes when they come up:
+    ```
+    k8s.io/cluster-autoscaler/node-template/label/eks.amazonaws.com/capacityType = SPOT
+    k8s.io/cluster-autoscaler/node-template/taint/cloud.google.com/gke-preemptible = true:NoSchedule
+    ```
+    Note that **all tags must be set to propagate to the instance**, or the cluster autoscaler won't see them. See https://github.com/kubernetes/autoscaler/issues/4490.
 6. Assuming the Kubernetes Cluster Autoscaler is running on the control plane, it should (eventually?) discover the Autoscaling Group. It might need to be restarted to do it. Then it should start using the Autoscaling Group to provision nodes when it thinks it needs them.
 
 ## Cluster Preparation
