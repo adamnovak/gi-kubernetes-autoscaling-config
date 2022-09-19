@@ -180,3 +180,21 @@ And then enable and start the service:
 sudo systemctl enable cleanup-nodes
 sudo systemctl start cleanup-nodes
 ```
+
+## Updates and Maintainance
+
+### Changing the Credentials
+
+If you need to rotate the join token or the cluster authentication certificates and hashes, edit `kubenode.credentials.cloud-config.yaml` and rebuild your user data. You will probably have to do this once for spot nodes and once for non-spot nodes, for each architecture in your cluster.
+
+### Recovering Config from Cloud
+
+If an update has been made to a launch template, but not committed back to the repository, you can unpack the individual YAML files from the launch template user data.
+
+Copy-paste the launch template's base64-encoded user data into `userdata.b64`, and then run this command to decode and decompress it, and to unpack the multipart MIME encoding:
+
+```
+base64 -d userdata.b64 | zcat - | mha-decode -single /dev/stdin
+```
+
+This will overwrite files in the current directory with those embedded in the user data.
