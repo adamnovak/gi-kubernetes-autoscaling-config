@@ -307,6 +307,13 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+# Add Master Node's SSH public key (root user) to default user so we can ssh to nodes in addition to AWS injected key
+users:
+  - name: centos
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1n4eKLl9V9P57adGg5lGR3U19hEdOZ4Vjc09yRfKg1iSLJTsm9VZdG78Zs69gNUv/DyFoNpHEkkKV08+48F2KLajNKOe29zhpaeOgtSFfotScNEUGhQZnpKoiteU4Xkvn09H1iuS2knabM0grAX39Fvx79/gr7WHua9Jed7pKaoFPoCESVVo9f75Ig51v60nhEkWPrvRkPhwPPP6AV68VJW9BVb4XLVDrgPtWUosKlbRmaYWvNwCcTvhErb48CZl5YkEe5tZmMU2xrSf3HAndpwR4rHBREqdbLJO5pc30lVA1fBAZx3W63R3CtVR9HvQzBnI/yJCS6mXZKvipw5Gv root@master.kube
+    sudo: ALL=(ALL) NOPASSWD:ALL
+
 # Make sure all the installed services will start on the next boot
 runcmd:
   - systemctl enable docker.service

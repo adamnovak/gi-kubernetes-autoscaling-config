@@ -102,7 +102,7 @@ yum_repos:
     gpgcheck: true
     gpgkey: https://download.docker.com/linux/centos/gpg
 packages:
-  - kernel-ml
+  - kernel-lt
   - yum-utils
   - device-mapper-persistent-data
   - lvm2
