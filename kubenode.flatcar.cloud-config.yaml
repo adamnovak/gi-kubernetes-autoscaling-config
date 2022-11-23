@@ -1,0 +1,16 @@
+#cloud-init
+
+# This file is for Flatcar-specific setup. 
+# TODO: Does Flatcar actuaqlly support the advanced cloud-config we use here
+# with its runner? Or does it need a separate Ignition stack?
+
+# Make sure to combine command lists
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+runcmd:
+  # Set timezone
+  - timedatectl set-timezone America/Los_Angeles
