@@ -1,0 +1,29 @@
+#cloud-config
+
+# This file is for Ubuntu-specific setup. We need Docker.
+
+# Make sure to combine command lists
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+# Set the main user able to use Docker
+# TODO: The "centos" user too?
+groups:
+  - docker
+system_info:
+  default_user:
+    groups: [docker]
+
+packages:
+  # We need Docker to run containers
+  - docker.io
+  # Kubeadm needs these
+  - conntrack
+  - socat
+
+runcmd:
+  # Set timezone
+  - timedatectl set-timezone America/Los_Angeles

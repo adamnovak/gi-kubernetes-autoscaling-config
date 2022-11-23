@@ -72,7 +72,8 @@ write_files:
       sudo mkdir -p /mnt/ephemeral
       if (("$ephemeral_count" == "1" )); then
           echo "one ephemeral drive to mount"
-          sudo mkfs.ext4 -F "${drives[@]}"
+          # Reserve 0 for superuser
+          sudo mkfs.ext4 -m 0 -F "${drives[@]}"
           sudo mount "${drives[@]}" /mnt/ephemeral
       fi
       if (("$ephemeral_count" > "1" )); then
@@ -82,7 +83,8 @@ write_files:
           done
           # determine force flag
           sudo mdadm --create -f --verbose /dev/md0 --level=0 --raid-devices=$ephemeral_count "${drives[@]}"
-          sudo mkfs.ext4 -F /dev/md0
+          # Reserve 0 for superuser
+          sudo mkfs.ext4 -m 0 -F /dev/md0
           sudo mount /dev/md0 /mnt/ephemeral
       fi
       for directory in "${directories[@]}"; do

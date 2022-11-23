@@ -16,8 +16,8 @@ This repo contains configuration files that we can use to set up autoscaling nod
     export JOIN_ENDPOINT="$(curl http://checkip.amazonaws.com):6443"
     env | grep "^JOIN_"
     ```
-    If provisioning spot nodes, make sure to include label and/or taints in WORKER_LABEL_SPEC and/or WORKER_TAINT_SPEC, such as `node-labels: 'eks.amazonaws.com/capacityType=SPOT'` or `node-taints: 'cloud.google.com/gke-preemptible=true'"`.
-3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, while for a Flatcar AMI you should not (although Flatcar's ignition may not actually understand the gzip/mime-multipart encoding or some of the cloud-config keys used).
+    If provisioning spot nodes, make sure to include label and/or taints in WORKER_LABEL_SPEC and/or WORKER_TAINT_SPEC, such as `node-labels: 'eks.amazonaws.com/capacityType=SPOT'` or `node-taints: 'cloud.google.com/gke-preemptible=true'"`. To check a YAML for syntax, use `cloud-init devel schema -c kubenode.credentials.cloud-config.yaml`.
+3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, and for Ubuntu you will need `kubenode.ubuntu.cloud-config.yaml`.
     ```
     umask 0066
     cloud-init devel make-mime \
@@ -26,13 +26,13 @@ This repo contains configuration files that we can use to set up autoscaling nod
         -a kubenode.centos7.cloud-config.yaml:cloud-config \
     | gzip -c | base64 | tr -d '\n' > user-data.txt
     ```
-    Or for Flatcar:
+    Or for Ubuntu:
     ```
     umask 0066
     cloud-init devel make-mime \
         -a kubenode.cloud-config.yaml:cloud-config \
         -a kubenode.credentials.cloud-config.yaml:cloud-config \
-        -a kubenode.flatcar.cloud-config.yaml:cloud-config \
+        -a kubenode.ubuntu.cloud-config.yaml:cloud-config \
     | gzip -c | base64 | tr -d '\n' > user-data.txt
     ```
     If your distribution doesn't ship `cloud-init`, you can install it in a Python virtualenv:
@@ -41,7 +41,7 @@ This repo contains configuration files that we can use to set up autoscaling nod
     . venv/bin/activate
     pip install https://github.com/canonical/cloud-init/releases/download/21.3/cloud-init-21.3.tar.gz
     ```
-4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice. For Flatcar you can consult [release feed files](https://stable.release.flatcar-linux.net/amd64-usr/current/flatcar_production_ami_us-west-2.txt). **Don't** check the request spot instance box here; configure that, if applicable, in the Autoscaling Group later.
+4. Put the user data into an AWS Launch Template for the instance type and AMI you want to run, for the `cg-kube` security group. Make sure to check "User data has already been base64 encoded". Make sure to use an AMI that includes cloud-init. [CentOS's official AMIs](https://centos.org/download/aws-images/) might be a good choice. **Don't** check the request spot instance box here; configure that, if applicable, in the Autoscaling Group later.
 5. Make an AWS Autoscaling Group around the Launch Template. Use the default subnet in `us-west-2b`. Set the minimum size to 0, and the maximum size to a sensible limit.
     If using multiple instance types for a spot ASG, you may be best off using capacity-optimized rather than lowest-price balancing; the cheapest spot pool may be full, at which point the whole ASG can't scale up.
     Be sure to give it the following tags (assuming the cluster's name is `gi-cluster`), which should also apply to instances:
