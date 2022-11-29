@@ -1,0 +1,20 @@
+#cloud-config
+
+# cloud-init file defining node labels and taints
+
+# Make sure to combine command lists
+merge_how:
+ - name: list
+   settings: [append]
+ - name: dict
+   settings: [no_replace, recurse_list]
+
+write_files:
+  - path: /opt/etc/kubernetes-config.env
+    content: |
+      # Labels to apply to the node.
+      # Could be something like "node-labels: 'eks.amazonaws.com/capacityType=SPOT'"
+      WORKER_LABEL_SPEC=""
+      # Taints to apply to the node.
+      # Could be something like "register-with-taints: 'cloud.google.com/gke-preemptible=true:NoSchedule'"
+      WORKER_TAINT_SPEC=""

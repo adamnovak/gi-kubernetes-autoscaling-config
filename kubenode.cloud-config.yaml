@@ -199,6 +199,7 @@ write_files:
           eviction-hard: "memory.available<200Mi,nodefs.available<10%"
           {PROVIDER_ID_SPEC}
           {CLOUD_PROVIDER_SPEC}
+          {HOSTNAME_SPEC}
           {WORKER_LABEL_SPEC}
           {WORKER_TAINT_SPEC}
       discovery:
@@ -224,10 +225,13 @@ write_files:
       else
         PROVIDER_ID_SPEC=""
       fi
+      # Determine AWS's idea of our hostname
+      HOSTNAME_SPEC="hostname-override: \"$(curl http://169.254.169.254/latest/meta-data/hostname)\""
       # Sub in variables from our environment
       # TODO: maybe these strings aren't allowed in a sed command?
       sed -i "s!{PROVIDER_ID_SPEC}!${PROVIDER_ID_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{CLOUD_PROVIDER_SPEC}!${CLOUD_PROVIDER_SPEC}!g" /opt/etc/kubernetes-worker.yml
+      sed -i "s!{HOSTNAME_SPEC}!${HOSTNAME_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{WORKER_LABEL_SPEC}!${WORKER_LABEL_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{WORKER_TAINT_SPEC}!${WORKER_TAINT_SPEC}!g" /opt/etc/kubernetes-worker.yml
       sed -i "s!{JOIN_ENDPOINT}!${JOIN_ENDPOINT}!g" /opt/etc/kubernetes-worker.yml
@@ -246,6 +250,7 @@ write_files:
       RemainAfterExit=yes
       EnvironmentFile=/opt/etc/kubernetes-setup.env
       EnvironmentFile=/opt/etc/kubernetes-credentials.env
+      EnvironmentFile=/opt/etc/kubernetes-config.env
       ExecStart=/usr/bin/bash /opt/bin/configure-kubernetes-worker.sh
       [Install]
       WantedBy=multi-user.target
@@ -305,6 +310,7 @@ write_files:
       RemainAfterExit=yes
       EnvironmentFile=/opt/etc/kubernetes-setup.env
       EnvironmentFile=/opt/etc/kubernetes-credentials.env
+      EnvironmentFile=/opt/etc/kubernetes-config.env
       ExecStart=/usr/bin/bash /opt/bin/join-kubernetes-cluster.sh
       [Install]
       WantedBy=multi-user.target

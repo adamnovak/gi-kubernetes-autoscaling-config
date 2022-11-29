@@ -16,14 +16,15 @@ This repo contains configuration files that we can use to set up autoscaling nod
     export JOIN_ENDPOINT="$(curl http://checkip.amazonaws.com):6443"
     env | grep "^JOIN_"
     ```
-    If provisioning spot nodes, make sure to include label and/or taints in WORKER_LABEL_SPEC and/or WORKER_TAINT_SPEC, such as `node-labels: 'eks.amazonaws.com/capacityType=SPOT'` or `node-taints: 'cloud.google.com/gke-preemptible=true'"`. To check a YAML for syntax, use `cloud-init devel schema -c kubenode.credentials.cloud-config.yaml`.
-3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, and for Ubuntu you will need `kubenode.ubuntu.cloud-config.yaml`.
+    To check a YAML for syntax, use `cloud-init devel schema -c kubenode.credentials.cloud-config.yaml`.
+3. Pack together all the YAML files appropriate for your target AMI into a base64-encoded single-line user data blob. For CentOS 7, you will need to include `kubenode.centos7.cloud-config.yaml`, and for Ubuntu you will need `kubenode.ubuntu.cloud-config.yaml`. You will also need to include the appropriate config YAML for your architecture and spot-ness.
     ```
     umask 0066
     cloud-init devel make-mime \
         -a kubenode.cloud-config.yaml:cloud-config \
         -a kubenode.credentials.cloud-config.yaml:cloud-config \
         -a kubenode.centos7.cloud-config.yaml:cloud-config \
+        -a kubenode.config.amd64.ondemand.cloud-config.yaml:cloud-config \
     | gzip -c | base64 | tr -d '\n' > user-data.txt
     ```
     Or for Ubuntu:
@@ -33,6 +34,7 @@ This repo contains configuration files that we can use to set up autoscaling nod
         -a kubenode.cloud-config.yaml:cloud-config \
         -a kubenode.credentials.cloud-config.yaml:cloud-config \
         -a kubenode.ubuntu.cloud-config.yaml:cloud-config \
+        -a kubenode.config.amd64.ondemand.cloud-config.yaml:cloud-config \
     | gzip -c | base64 | tr -d '\n' > user-data.txt
     ```
     If your distribution doesn't ship `cloud-init`, you can install it in a Python virtualenv:
