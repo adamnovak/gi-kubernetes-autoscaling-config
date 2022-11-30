@@ -14,7 +14,7 @@ write_files:
     content: |
       # Labels to apply to the node.
       # Could be something like "node-labels: 'eks.amazonaws.com/capacityType=SPOT'"
-      WORKER_LABEL_SPEC=""
+      WORKER_LABEL_SPEC="node-labels: 'eks.amazonaws.com/capacityType=SPOT'"
       # Taints to apply to the node.
       # Could be something like "register-with-taints: 'cloud.google.com/gke-preemptible=true:NoSchedule'"
-      WORKER_TAINT_SPEC=""
+      WORKER_TAINT_SPEC="register-with-taints: 'cloud.google.com/gke-preemptible=true:NoSchedule'"

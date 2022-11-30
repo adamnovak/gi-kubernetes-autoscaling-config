@@ -27,3 +27,9 @@ packages:
 runcmd:
   # Set timezone
   - timedatectl set-timezone America/Los_Angeles
+  # Turn off AppArmor. CentOS didn't have it, and it breaks Singularity in unprivileged containers.
+  # TODO: Work out what exactly about the default AppArmor profiles is blocking the exact syscall we need, and adjust them.
+  # TODO: Maybe adjust the cluster to default everybosy to an unconfined AppArmor profile instead?
+  # See: <https://github.com/DataBiosphere/toil/pull/4290#issuecomment-1332865136>
+  - systemctl stop apparmor
+  - systemctl disable apparmor
