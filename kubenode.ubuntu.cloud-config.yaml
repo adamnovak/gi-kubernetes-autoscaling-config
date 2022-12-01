@@ -24,12 +24,61 @@ packages:
   - conntrack
   - socat
 
+write_files:
+  - path: /etc/systemd/system/docker.service.d/override.conf
+    content: |
+      # Make sure we can definitely load our version of the AppArmor profile
+      # before Docker can make its own
+      # See: <https://github.com/DataBiosphere/toil/pull/4290#issuecomment-1332865136>
+      [Service]
+      ExecStartPre=apparmor_parser --replace /etc/apparmor.d/docker
+  - path: /etc/apparmor.d/docker
+    content: |
+      #include <tunables/global>
+      profile docker-default flags=(attach_disconnected,mediate_deleted) {
+        #include <abstractions/base>
+        network,
+        capability,
+        file,
+        umount,
+        # Mounts needed for Singularity user-namespace containers
+        mount options=(rw,rshared) -> /,
+        mount options=(rw,move) -> /,
+        mount fstype="tmpfs" options=(rw,nosuid),
+        mount options=(rw,bind),
+        mount options=(rw,slave),
+        mount options=(rw,rbind),
+        mount options=(rw,rslave),
+        # These might be needed if you want read-only stuff?
+        mount options=(ro,bind),
+        mount options=(ro,slave),
+        mount options=(ro,rbind),
+        mount options=(ro,rslave),
+        # The rest is the template, without the blanket deny mount, slightly condensed.
+        # See https://gist.github.com/disconnect3d/d578af68b09ab56db657854ec03879aa
+        signal (receive) peer=unconfined,
+        signal (send,receive) peer=docker-default,
+        deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+        # deny write to files not in /proc/<number>/** or /proc/sys/**
+        deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9][^0-9]*}/** w,
+        deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+        deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+        deny @{PROC}/sysrq-trigger rwklx,
+        deny @{PROC}/kcore rwklx,
+        deny /sys/[^f]*/** wklx,
+        deny /sys/f[^s]*/** wklx,
+        deny /sys/fs/[^c]*/** wklx,
+        deny /sys/fs/c[^g]*/** wklx,
+        deny /sys/fs/cg[^r]*/** wklx,
+        deny /sys/firmware/** rwklx,
+        deny /sys/kernel/security/** rwklx,
+        # suppress ptrace denials when using 'docker ps' or using 'ps' inside a container
+        ptrace (trace,read) peer=docker-default,
+      }
+
+
 runcmd:
   # Set timezone
   - timedatectl set-timezone America/Los_Angeles
-  # Turn off AppArmor. CentOS didn't have it, and it breaks Singularity in unprivileged containers.
-  # TODO: Work out what exactly about the default AppArmor profiles is blocking the exact syscall we need, and adjust them.
-  # TODO: Maybe adjust the cluster to default everybosy to an unconfined AppArmor profile instead?
-  # See: <https://github.com/DataBiosphere/toil/pull/4290#issuecomment-1332865136>
-  - systemctl stop apparmor
-  - systemctl disable apparmor
+
+
