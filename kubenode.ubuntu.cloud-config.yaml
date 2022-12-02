@@ -41,19 +41,9 @@ write_files:
         capability,
         file,
         umount,
-        # Mounts needed for Singularity user-namespace containers
-        mount options=(rw,rshared) -> /,
-        mount options=(rw,move) -> /,
-        mount fstype="tmpfs" options=(rw,nosuid),
-        mount options=(rw,bind),
-        mount options=(rw,slave),
-        mount options=(rw,rbind),
-        mount options=(rw,rslave),
-        # These might be needed if you want read-only stuff?
-        mount options=(ro,bind),
-        mount options=(ro,slave),
-        mount options=(ro,rbind),
-        mount options=(ro,rslave),
+        # Singularity needs to be able to use mount
+        # TODO: limit it
+        mount,
         # The rest is the template, without the blanket deny mount, slightly condensed.
         # See https://gist.github.com/disconnect3d/d578af68b09ab56db657854ec03879aa
         signal (receive) peer=unconfined,
